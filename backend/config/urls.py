@@ -21,7 +21,8 @@ from storage.views import (
     latest_sensor_data,
     sensor_history,
     ai_recommendation,
-    health_check
+    health_check,
+    history_by_day
 )
 
 urlpatterns = [
@@ -30,6 +31,7 @@ urlpatterns = [
     # API endpoints
     path('api/latest/', latest_sensor_data, name='latest_sensor_data'),
     path('api/history/', sensor_history, name='sensor_history'),
+    path('api/history-by-day/', history_by_day, name='history_by_day'),
     path('api/ai-recommendation/', ai_recommendation, name='ai_recommendation'),
     path('api/health/', health_check, name='health_check'),
 ]

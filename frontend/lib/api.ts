@@ -27,10 +27,17 @@ export async function getLatestSensorData(): Promise<SensorData> {
 
 /**
  * Fetch sensor history from Django backend
- * GET /api/history/?limit=50
+ * GET /api/history/?limit=50&interval=10
+ * For daily averages: GET /api/history/?limit=30&interval=daily
+ * For hourly averages: GET /api/history/?limit=24&interval=hourly
  */
-export async function getSensorHistory(limit: number = 50): Promise<HistoryPoint[]> {
-  const response = await fetch(`${BASE_URL}/api/history/?limit=${limit}`, {
+export async function getSensorHistory(limit: number = 50, intervalMinutes: number | string = 'daily'): Promise<HistoryPoint[]> {
+  const intervalParam = typeof intervalMinutes === 'string' ? intervalMinutes : intervalMinutes;
+  const url = intervalParam 
+    ? `${BASE_URL}/api/history/?limit=${limit}&interval=${intervalParam}`
+    : `${BASE_URL}/api/history/?limit=${limit}`;
+  
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -48,11 +55,20 @@ export async function getSensorHistory(limit: number = 50): Promise<HistoryPoint
     let timeStr = '';
     if (item.timestamp) {
       const date = new Date(item.timestamp);
-      timeStr = date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: true
-      });
+      // Check if it's a daily or hourly average
+      if (item.is_daily_average || item.is_hourly_average) {
+        timeStr = item.hour_label || date.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        });
+      } else {
+        timeStr = date.toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          hour12: true
+        });
+      }
     }
     return {
       time: timeStr,
@@ -60,6 +76,11 @@ export async function getSensorHistory(limit: number = 50): Promise<HistoryPoint
       humidity: item.humidity,
       gas_level: item.gas_level,
       timestamp: item.timestamp,
+      is_daily_average: item.is_daily_average,
+      is_hourly_average: item.is_hourly_average,
+      hour_label: item.hour_label,
+      has_data: item.has_data,
+      date_display: item.date_display,
     };
   });
 }
@@ -108,8 +129,8 @@ export async function fetchLatestData(): Promise<SensorData> {
   return getLatestSensorData();
 }
 
-export async function fetchHistoryData(): Promise<HistoryPoint[]> {
-  return getSensorHistory(50);
+export async function fetchHistoryData(intervalMinutes: number | string = 'daily'): Promise<HistoryPoint[]> {
+  return getSensorHistory(50, intervalMinutes);
 }
 
 export async function fetchAIRecommendation(): Promise<AIRecommendation> {
@@ -122,4 +143,45 @@ export async function fetchAIRecommendation(): Promise<AIRecommendation> {
     peltier_status: sensorData.peltier_status,
     gas_level: sensorData.gas_level,
   });
+}
+
+// Types for history-by-day API
+export interface HourlyData {
+  hour: number;
+  temperature: number | null;
+  humidity: number | null;
+  gas_level: number | null;
+  fan_status: boolean | null;
+  peltier_status: boolean | null;
+  status: string;
+}
+
+export interface HistoryByDayResponse {
+  success: boolean;
+  date: string;
+  hours: HourlyData[];
+}
+
+/**
+ * Fetch hourly sensor data for a specific day
+ * GET /api/history-by-day/?year=YYYY&month=MM&day=DD
+ */
+export async function getHistoryByDay(year: number, month: number, day: number): Promise<HistoryByDayResponse> {
+  const response = await fetch(
+    `${BASE_URL}/api/history-by-day/?year=${year}&month=${month}&day=${day}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  const result: HistoryByDayResponse = await response.json();
+
+  if (!result.success) {
+    throw new Error('Failed to fetch history by day');
+  }
+
+  return result;
 }

@@ -9,7 +9,7 @@ import {
   Droplets,
   AlertTriangle,
   Wind,
-  Snowflake,
+  Flame,
   Gauge,
 } from 'lucide-react';
 
@@ -124,10 +124,10 @@ export function MetricsSection() {
         color={data.fan_status ? 'green' : 'gray'}
       />
       <MetricCard
-        title="Peltier Status"
+        title="Heater Status"
         value={data.peltier_status ? 'ON' : 'OFF'}
-        icon={Snowflake}
-        color={data.peltier_status ? 'blue' : 'gray'}
+        icon={Flame}
+        color={data.peltier_status ? 'red' : 'gray'}
       />
     </div>
   );

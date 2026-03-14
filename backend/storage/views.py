@@ -20,7 +20,21 @@ def serialize_mongo_document(doc):
     """Convert MongoDB document to JSON-safe format."""
     if not doc:
         return None
+
     doc["_id"] = str(doc["_id"])
+
+    # Force UTC timezone indicator for frontend
+    if "timestamp" in doc and doc["timestamp"]:
+        ts = doc["timestamp"]
+
+        # If timestamp is datetime object
+        if hasattr(ts, "isoformat"):
+            doc["timestamp"] = ts.isoformat() + "Z"
+
+        # If already string but missing Z
+        elif isinstance(ts, str) and not ts.endswith("Z"):
+            doc["timestamp"] = ts + "Z"
+
     return doc
 
 
@@ -59,7 +73,17 @@ def sensor_history(request):
         except ValueError:
             limit = 50
 
-        history = MongoDB.get_sensor_history(limit=limit)
+        # Get optional interval parameter for 10-minute sampling
+        interval_minutes = request.GET.get("interval")
+        if interval_minutes:
+            try:
+                interval_minutes = int(interval_minutes)
+            except ValueError:
+                interval_minutes = None
+        else:
+            interval_minutes = None
+
+        history = MongoDB.get_sensor_history(limit=limit, interval_minutes=interval_minutes)
 
         history = [serialize_mongo_document(doc) for doc in history]
 
@@ -151,3 +175,66 @@ def health_check(request):
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status
     })
+
+
+@require_http_methods(["GET"])
+def history_by_day(request):
+    """
+    Get hourly sensor data for a specific day.
+    
+    Query parameters:
+    - year: Year (e.g., 2026)
+    - month: Month (1-12)
+    - day: Day (1-31)
+    
+    Returns hourly averages for temperature, humidity, gas_level,
+    and majority vote for fan_status and peltier_status.
+    """
+    try:
+        # Get query parameters
+        year = request.GET.get("year")
+        month = request.GET.get("month")
+        day = request.GET.get("day")
+        
+        # Validate required parameters
+        if not year or not month or not day:
+            return JsonResponse({
+                "success": False,
+                "error": "Missing required parameters: year, month, day"
+            }, status=400)
+        
+        # Convert to integers
+        try:
+            year = int(year)
+            month = int(month)
+            day = int(day)
+        except ValueError:
+            return JsonResponse({
+                "success": False,
+                "error": "Invalid parameter values: year, month, day must be integers"
+            }, status=400)
+        
+        # Validate ranges
+        if month < 1 or month > 12:
+            return JsonResponse({
+                "success": False,
+                "error": "Invalid month: must be between 1 and 12"
+            }, status=400)
+        
+        if day < 1 or day > 31:
+            return JsonResponse({
+                "success": False,
+                "error": "Invalid day: must be between 1 and 31"
+            }, status=400)
+        
+        # Get data from database
+        result = MongoDB.get_history_by_day(year, month, day)
+        
+        return JsonResponse(result)
+    
+    except Exception as e:
+        logger.error(f"Error fetching history by day: {e}")
+        return JsonResponse({
+            "success": False,
+            "error": "Failed to fetch history data"
+        }, status=500)

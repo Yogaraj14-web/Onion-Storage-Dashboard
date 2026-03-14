@@ -6,6 +6,7 @@ import { HardwarePanel } from '@/components/hardware-panel';
 import { ChartsSection } from '@/components/charts-section';
 import { AIAdvisory } from '@/components/ai-advisory';
 import { Footer } from '@/components/footer';
+import { HistoricalSensorView } from '@/components/historical-sensor-view';
 
 export default function Home() {
   return (
@@ -36,6 +37,11 @@ export default function Home() {
             <ChartsSection />
           </div>
         </div>
+
+        {/* Historical Sensor View */}
+        <section>
+          <HistoricalSensorView />
+        </section>
 
         {/* AI Advisory */}
         <section>

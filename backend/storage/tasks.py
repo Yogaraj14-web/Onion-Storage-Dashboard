@@ -19,6 +19,7 @@ def fetch_thingspeak_data() -> dict | None:
     Fetch latest data from ThingSpeak channel.
     Returns dictionary with sensor data or None if fetch fails.
     """
+
     channel_id = os.getenv("THINGSPEAK_CHANNEL_ID")
     api_key = os.getenv("THINGSPEAK_READ_API_KEY")
 
@@ -33,28 +34,34 @@ def fetch_thingspeak_data() -> dict | None:
         response.raise_for_status()
         latest = response.json()
 
-        # Validate required fields
-        if not latest.get("field2") or not latest.get("field3"):
+        # Strictly require temperature and humidity
+        if latest.get("field1") is None or latest.get("field2") is None:
             logger.warning("Incomplete ThingSpeak data received")
             return None
 
         try:
-            temp = float(latest["field1"]) if latest.get("field1") else None
-            humidity = float(latest["field2"]) if latest.get("field2") else None
-            fan = latest.get("field3") == "1"
-            peltier = latest.get("field4") == "1"
-            gas = float(latest["field5"]) if latest.get("field5") else None
+            temperature = float(latest["field1"])
+            humidity = float(latest["field2"])
         except (ValueError, TypeError):
-            logger.warning("Invalid sensor data format received")
+            logger.warning("Invalid temperature or humidity format")
             return None
 
+        # Optional fields
+        fan_status = latest.get("field3") == "1"
+        peltier_status = latest.get("field4") == "1"
+
+        try:
+            gas_level = float(latest["field5"]) if latest.get("field5") else None
+        except (ValueError, TypeError):
+            gas_level = None
+
         sensor_data = {
-            "temperature": temp,
+            "temperature": temperature,
             "humidity": humidity,
-            "fan_status": fan,
-            "peltier_status": peltier,
-            "gas_level": gas,
-            "timestamp": datetime.utcnow(),
+            "fan_status": fan_status,
+            "peltier_status": peltier_status,
+            "gas_level": gas_level,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
         }
 
         return sensor_data
@@ -86,6 +93,7 @@ def start_scheduler() -> BackgroundScheduler:
     """
     Start APScheduler to fetch ThingSpeak data every 30 seconds.
     """
+
     scheduler = BackgroundScheduler()
 
     scheduler.add_job(
@@ -99,7 +107,7 @@ def start_scheduler() -> BackgroundScheduler:
     scheduler.start()
     logger.info("ThingSpeak data fetch scheduler started")
 
-    # Fetch immediately on startup
+    # Fetch immediately once on startup
     fetch_and_store_sensor_data()
 
     return scheduler

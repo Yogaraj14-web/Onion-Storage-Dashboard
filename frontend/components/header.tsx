@@ -2,12 +2,27 @@
 
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Clock } from 'lucide-react';
+import { Clock, Wifi, WifiOff } from 'lucide-react';
+import { getLatestSensorData } from '@/lib/api';
+import { isSensorOnline } from '@/lib/utils';
 
 export function Header() {
-  const isOnline = true;
+  const [isOnline, setIsOnline] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
+  const [minutesAgo, setMinutesAgo] = useState<number | null>(null);
+
+  // Calculate minutes since last update
+  const getMinutesSinceUpdate = (timestamp: string | undefined | null): number | null => {
+    if (!timestamp) return null;
+    try {
+      const lastUpdate = new Date(timestamp).getTime();
+      const now = Date.now();
+      return Math.floor((now - lastUpdate) / 60000); // Convert to minutes
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const updateTime = () => {
@@ -35,6 +50,27 @@ export function Header() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const checkSensorStatus = async () => {
+      try {
+        const sensorData = await getLatestSensorData();
+        const online = isSensorOnline(sensorData.timestamp);
+        setIsOnline(online);
+        setMinutesAgo(getMinutesSinceUpdate(sensorData.timestamp));
+      } catch (error) {
+        // If we can't get sensor data, show offline
+        setIsOnline(false);
+        setMinutesAgo(null);
+      }
+    };
+
+    checkSensorStatus();
+    
+    // Check sensor status every 10 seconds
+    const interval = setInterval(checkSensorStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <header className="border-b border-border bg-card px-6 py-8">
       <div className="flex items-start justify-between">
@@ -59,7 +95,17 @@ export function Header() {
                 : 'bg-red-600 hover:bg-red-700'
             }`}
           >
-            {isOnline ? '● Online' : '● Offline'}
+            {isOnline ? (
+              <span className="flex items-center gap-2">
+                <Wifi className="h-4 w-4" />
+                Online ({minutesAgo !== null ? `${minutesAgo} min ago` : 'just now'})
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <WifiOff className="h-4 w-4" />
+                Offline
+              </span>
+            )}
           </Badge>
         </div>
       </div>

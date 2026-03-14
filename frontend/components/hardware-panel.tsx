@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { fetchLatestData } from '@/lib/api';
 import { SensorData } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wind, Snowflake } from 'lucide-react';
+import { Wind, Flame } from 'lucide-react';
 
 export function HardwarePanel() {
   const [fanOn, setFanOn] = useState(false);
-  const [peltierOn, setPeltierOn] = useState(false);
+  const [heaterOn, setHeaterOn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +19,7 @@ export function HardwarePanel() {
       try {
         const data = await fetchLatestData();
         setFanOn(data.fan_status);
-        setPeltierOn(data.peltier_status);
+        setHeaterOn(data.peltier_status);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load hardware status');
         console.error('Error loading hardware status:', err);
@@ -73,8 +73,18 @@ export function HardwarePanel() {
           animation: rotateFan 2s linear infinite;
           transform-origin: center;
         }
-        .fan-glow {
-          filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.6)) drop-shadow(0 0 30px rgba(34, 197, 94, 0.3));
+        @keyframes heatPulse {
+          0%, 100% { 
+            opacity: 0.6;
+            transform: scale(1);
+          }
+          50% { 
+            opacity: 1;
+            transform: scale(1.05);
+          }
+        }
+        .heater-pulse {
+          animation: heatPulse 1.5s ease-in-out infinite;
         }
       `}</style>
 
@@ -154,34 +164,37 @@ export function HardwarePanel() {
         </div>
       </div>
 
-      {/* Peltier Cooling - No Container */}
+      {/* Peltier Heater - No Container */}
       <div className="flex flex-col items-center justify-center gap-4">
         <div className="relative w-28 h-28 flex items-center justify-center">
           <div
             className={`absolute inset-0 rounded-full border-3 flex items-center justify-center transition-all ${
-              peltierOn
-                ? 'border-cyan-400 shadow-lg'
+              heaterOn
+                ? 'border-orange-500 shadow-lg heater-pulse'
                 : 'border-gray-600'
             }`}
             style={{
-              boxShadow: peltierOn
-                ? '0 0 20px rgba(34, 211, 238, 0.6), 0 0 30px rgba(34, 211, 238, 0.3)'
+              background: heaterOn
+                ? 'radial-gradient(circle, rgba(249, 115, 22, 0.2) 0%, transparent 70%)'
+                : 'transparent',
+              boxShadow: heaterOn
+                ? '0 0 20px rgba(249, 115, 22, 0.6), 0 0 30px rgba(249, 115, 22, 0.3)'
                 : 'none',
             }}
           >
-            <Snowflake
+            <Flame
               className={`h-12 w-12 ${
-                peltierOn ? 'text-cyan-300' : 'text-gray-500'
+                heaterOn ? 'text-orange-500' : 'text-gray-500'
               }`}
             />
           </div>
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-foreground">Peltier Cooler</p>
+          <p className="text-sm font-medium text-foreground">Peltier Heater</p>
           <p className={`text-xs font-semibold ${
-            peltierOn ? 'text-cyan-400' : 'text-gray-500'
+            heaterOn ? 'text-orange-500' : 'text-gray-500'
           }`}>
-            {peltierOn ? 'COOLING' : 'IDLE'}
+            {heaterOn ? 'HEATING' : 'IDLE'}
           </p>
         </div>
       </div>
